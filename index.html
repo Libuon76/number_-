@@ -1,804 +1,825 @@
 <!DOCTYPE html>
+
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数字当てゲーム</title>
-    <!-- Tailwind CSS CDNを読み込み -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* グローバルなフォント設定と背景色 */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #1a1a2e; /* ダークネイビーの背景 */
-            color: #e0e0e0; /* 明るいテキスト */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        /* ボタンのホバーエフェクト */
-        .btn-primary:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
-        }
-        /* メッセージエリアのスタイル */
-        #messageArea {
-            min-height: 4.5rem; /* メッセージを安定させるための最小高さ */
-            line-height: 1.5;
-        }
-        /* 秘密の数字入力エリアを中央に配置 */
-        #secretSetterArea input {
-            text-align: center;
-        }
+	<meta charset="UTF-8">
+	<meta content="width=device-width, initial-scale=1.0" name="viewport">
 
-        /* 勝利時の派手なアニメーションを追加 */
-        @keyframes pulse-once {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        /* 勝利判定時に使用するクラス */
-        .animate-win {
-            animation: pulse-once 1.5s ease-in-out 3; /* 3回点滅させる */
-        }
-    </style>
-    <script>
-        // ゲーム変数
-        let targetNumber; // 正解の数字
-        let guessCount = 1;
-        let gameMode = null; // 'cpu' または 'friend'
+	<title>数字当てゲーム</title><!-- Tailwind CSS CDNを読み込み -->
 
-        let totalRounds = 0;
-        let currentRound = 0;
-        
-        let numPlayers = 2; // プレイヤー人数 (友達モードでのみ使用)
-        let playerScores = []; // スコアは配列で管理 (友達モード:人数分, CPUモード: [P1, CPU])
-        let playerNames = []; // プレイヤー名も配列で管理
-        
-        // 友達モード: プレイヤーインデックス (0, 1, 2, ...), CPUモード: インデックス(0) または 'CPU'
-        let setterPlayer; 
-        let guesserPlayer; 
-        
-        let cpuLevel = 'Pro'; // CPUの難易度: 'Easy', 'Normal', 'Pro'
+	<script src="https://cdn.tailwindcss.com">
+	</script>
+	<style>
+	       /* グローバルなフォント設定と背景色 */
+	       body {
+	           font-family: 'Inter', sans-serif;
+	           background-color: #1a1a2e; /* ダークネイビーの背景 */
+	           color: #e0e0e0; /* 明るいテキスト */
+	           display: flex;
+	           justify-content: center;
+	           align-items: center;
+	           min-height: 100vh;
+	           padding: 20px;
+	       }
+	       /* ボタンのホバーエフェクト */
+	       .btn-primary:hover {
+	           opacity: 0.9;
+	           transform: translateY(-1px);
+	       }
+	       /* メッセージエリアのスタイル */
+	       #messageArea {
+	           min-height: 4.5rem; /* メッセージを安定させるための最小高さ */
+	           line-height: 1.5;
+	       }
+	       /* 秘密の数字入力エリアを中央に配置 */
+	       #secretSetterArea input {
+	           text-align: center;
+	       }
 
-        // CPUの予想用データ (二分探索用)
-        let cpuGuessData = {
-            low: 1,
-            high: 100,
-            history: []
-        };
+	       /* 勝利時の派手なアニメーションを追加 */
+	       @keyframes pulse-once {
+	           0% { transform: scale(1); opacity: 1; }
+	           50% { transform: scale(1.1); opacity: 0.8; }
+	           100% { transform: scale(1); opacity: 1; }
+	       }
+	       /* 勝利判定時に使用するクラス */
+	       .animate-win {
+	           animation: pulse-once 1.5s ease-in-out 3; /* 3回点滅させる */
+	       }
+	</style>
+	<script>
+	       // ゲーム変数
+	       let targetNumber; // 正解の数字
+	       let guessCount = 1;
+	       let gameMode = null; // 'cpu' または 'friend'
 
-        // DOM要素への参照
-        let modeSelectionArea;
-        let mainGameArea;
-        let roundSetterArea; // ラウンド数設定エリア
-        let scoreDisplay; // スコア表示エリア
-        let guessesElement, lastResultElement, lowOrHiElement, guessSubmitButton, guessField, resetArea;
-        let secretSetterArea, secretField, setSecretButton, guessInputArea, gameTitleElement;
-        let roundSelect, numPlayersSelect, cpuLevelSelection, cpuLevelSelect;
-        let friendNameInputContainer; // 友達モードの名前入力コンテナ
-        let finalResultArea, finalResultTitle, finalResultMessage, finalScoreDetails, finalResetButton;
+	       let totalRounds = 0;
+	       let currentRound = 0;
+	       
+	       let numPlayers = 2; // プレイヤー人数 (友達モードでのみ使用)
+	       let playerScores = []; // スコアは配列で管理 (友達モード:人数分, CPUモード: [P1, CPU])
+	       let playerNames = []; // プレイヤー名も配列で管理
+	       
+	       // 友達モード: プレイヤーインデックス (0, 1, 2, ...), CPUモード: インデックス(0) または 'CPU'
+	       let setterPlayer; 
+	       let guesserPlayer; 
+	       
+	       let cpuLevel = 'Pro'; // CPUの難易度: 'Easy', 'Normal', 'Pro'
 
-        // すべてのDOM要素を取得し、イベントリスナーを設定
-        window.onload = function() {
-            // ゲームロジック要素
-            guessesElement = document.getElementById('guesses');
-            lastResultElement = document.getElementById('lastResult');
-            lowOrHiElement = document.getElementById('lowOrHi');
-            guessSubmitButton = document.getElementById('guessSubmit');
-            guessField = document.getElementById('guessField');
-            resetArea = document.getElementById('resetArea');
-            guessInputArea = document.getElementById('guessInputArea');
-            gameTitleElement = document.getElementById('gameTitle');
-            scoreDisplay = document.getElementById('scoreDisplay');
+	       // CPUの予想用データ (二分探索用)
+	       let cpuGuessData = {
+	           low: 1,
+	           high: 100,
+	           history: []
+	       };
 
-            // モード/ラウンド選択要素
-            modeSelectionArea = document.getElementById('modeSelectionArea');
-            mainGameArea = document.getElementById('mainGameArea');
-            roundSetterArea = document.getElementById('roundSetterArea');
-            roundSelect = document.getElementById('roundSelect');
-            numPlayersSelect = document.getElementById('numPlayersSelect'); // 新しい人数選択
-            secretSetterArea = document.getElementById('secretSetterArea');
-            secretField = document.getElementById('secretField');
-            setSecretButton = document.getElementById('setSecretButton');
-            
-            // CPUレベル要素の取得
-            cpuLevelSelection = document.getElementById('cpuLevelSelection');
-            cpuLevelSelect = document.getElementById('cpuLevelSelect');
-            
-            // プレイヤー名入力要素の取得 (新設)
-            friendNameInputContainer = document.getElementById('friendNameInputContainer');
-            
-            // リザルト画面要素の取得
-            finalResultArea = document.getElementById('finalResultArea');
-            finalResultTitle = document.getElementById('finalResultTitle');
-            finalResultMessage = document.getElementById('finalResultMessage');
-            finalScoreDetails = document.getElementById('finalScoreDetails');
-            finalResetButton = document.getElementById('finalResetButton');
+	       // DOM要素への参照
+	       let modeSelectionArea;
+	       let mainGameArea;
+	       let roundSetterArea; // ラウンド数設定エリア
+	       let scoreDisplay; // スコア表示エリア
+	       let guessesElement, lastResultElement, lowOrHiElement, guessSubmitButton, guessField, resetArea;
+	       let secretSetterArea, secretField, setSecretButton, guessInputArea, gameTitleElement;
+	       let roundSelect, numPlayersSelect, cpuLevelSelection, cpuLevelSelect;
+	       let friendNameInputContainer; // 友達モードの名前入力コンテナ
+	       let finalResultArea, finalResultTitle, finalResultMessage, finalScoreDetails, finalResetButton;
 
+	       // すべてのDOM要素を取得し、イベントリスナーを設定
+	       window.onload = function() {
+	           // ゲームロジック要素
+	           guessesElement = document.getElementById('guesses');
+	           lastResultElement = document.getElementById('lastResult');
+	           lowOrHiElement = document.getElementById('lowOrHi');
+	           guessSubmitButton = document.getElementById('guessSubmit');
+	           guessField = document.getElementById('guessField');
+	           resetArea = document.getElementById('resetArea');
+	           guessInputArea = document.getElementById('guessInputArea');
+	           gameTitleElement = document.getElementById('gameTitle');
+	           scoreDisplay = document.getElementById('scoreDisplay');
 
-            // --- イベントリスナー設定 ---
-            document.getElementById('cpuModeButton').addEventListener('click', () => showRoundSelection('cpu'));
-            document.getElementById('friendModeButton').addEventListener('click', () => showRoundSelection('friend'));
-            document.getElementById('startFriendGameButton').addEventListener('click', setRounds);
-            guessSubmitButton.addEventListener('click', checkGuess);
-            setSecretButton.addEventListener('click', setSecretNumber);
-            finalResetButton.addEventListener('click', showModeSelection);
-            
-            // 人数選択ドロップダウンが変更されたら、名前入力フィールドを更新
-            numPlayersSelect.addEventListener('change', (e) => generateNameFields(e.target.value));
-
-            // --- Enterキーでの送信を有効化 ---
-            guessField.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    guessSubmitButton.click();
-                    e.preventDefault(); 
-                }
-            });
-            secretField.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    setSecretButton.click();
-                    e.preventDefault(); 
-                }
-            });
-
-            showModeSelection();
-        };
-
-        // モード選択画面を表示
-        function showModeSelection() {
-            gameMode = null;
-            totalRounds = 0;
-            currentRound = 0;
-            playerNames = [];
-            playerScores = [];
-            
-            // すべてのゲーム画面を非表示
-            mainGameArea.classList.add('hidden');
-            roundSetterArea.classList.add('hidden');
-            finalResultArea.classList.add('hidden');
-            
-            // モード選択画面を表示
-            modeSelectionArea.classList.remove('hidden');
-            document.querySelector('.game-card').classList.add('max-w-md');
-            
-            // タイトル画面のスタイルに戻す
-            gameTitleElement.textContent = '🔮 数字当てゲーム';
-            gameTitleElement.className = 'text-5xl font-extrabold text-yellow-300 mb-2 text-center transform scale-105';
-            document.getElementById('gameTagline').classList.remove('hidden');
-        }
-
-        // ラウンド数選択画面を表示
-        function showRoundSelection(mode) {
-            gameMode = mode;
-            modeSelectionArea.classList.add('hidden');
-            roundSetterArea.classList.remove('hidden');
-            document.querySelector('.game-card').classList.add('max-w-md'); 
-            
-            // タイトルをモード設定用に変更
-            gameTitleElement.className = 'text-3xl font-extrabold text-white mb-4 text-center';
-            document.getElementById('gameTagline').classList.add('hidden');
-
-            if (mode === 'friend') {
-                gameTitleElement.textContent = '🤝 対戦モード設定 (多人数対応)';
-                cpuLevelSelection.classList.add('hidden');
-                document.getElementById('friendPlayerSettings').classList.remove('hidden'); // 人数設定を表示
-                generateNameFields(numPlayersSelect.value); // 初期人数で名前フィールドを生成
-            } else {
-                gameTitleElement.textContent = '🤖 CPU対戦設定';
-                cpuLevelSelection.classList.remove('hidden');
-                document.getElementById('friendPlayerSettings').classList.add('hidden'); // 人数設定を非表示
-            }
-        }
-        
-        // 人数に応じて名前入力フィールドを動的に生成
-        function generateNameFields(count) {
-            const container = document.getElementById('friendNameInputContainer');
-            container.innerHTML = ''; // クリア
-            numPlayers = Number(count);
-            
-            for (let i = 0; i < numPlayers; i++) {
-                const inputHtml = `
-                    <input type="text" id="p${i}NameField" placeholder="プレイヤー${i + 1}の名前" 
-                           value="P${i + 1}" 
-                           class="p-3 w-full text-lg text-white bg-[#303450] border-2 border-pink-600 rounded-xl focus:border-pink-500 shadow-inner">
-                `;
-                container.innerHTML += inputHtml;
-            }
-        }
-
-        // ラウンド数を設定してゲームを開始
-        function setRounds() {
-            totalRounds = Number(roundSelect.value);
-            
-            if (totalRounds <= 0) {
-                 alertMessage('ラウンド数を選択してください。');
-                return;
-            }
-
-            // 1. 名前とスコアの初期化
-            if (gameMode === 'friend') {
-                numPlayers = Number(numPlayersSelect.value);
-                playerNames = [];
-                for (let i = 0; i < numPlayers; i++) {
-                    const nameField = document.getElementById(`p${i}NameField`);
-                    if (!nameField || nameField.value.trim() === '') {
-                        alertMessage(`プレイヤー${i + 1}の名前を入力してください。`);
-                        return;
-                    }
-                    playerNames.push(nameField.value.trim());
-                }
-                playerScores = new Array(numPlayers).fill(0);
-            } else if (gameMode === 'cpu') {
-                cpuLevel = cpuLevelSelect.value;
-                playerNames = ['あなた', `CPU (${cpuLevel})`];
-                playerScores = [0, 0]; // P1(0), CPU(1)
-            }
-            
-            // 2. バリデーション (友達モードではラウンド数が人数Nで割り切れることが望ましいが、必須としない)
-            if (gameMode === 'friend' && totalRounds % numPlayers !== 0) {
-                // アラートではなく警告
-                console.warn("ラウンド数がプレイヤー人数で割り切れないため、ラウンド途中でゲームが終了する可能性があります。");
-            }
-            
-            // 3. ゲーム開始
-            roundSetterArea.classList.add('hidden');
-            mainGameArea.classList.remove('hidden');
-            finalResultArea.classList.add('hidden');
-            document.querySelector('.game-card').classList.remove('max-w-md'); 
-            
-            currentRound = 0;
-            
-            if (gameMode === 'cpu') {
-                startNextCPURound();
-            } else {
-                startNextFriendRound();
-            }
-        }
-        
-        // ------------------------------------
-        // --- 友達対戦モードのロジック ---
-        // ------------------------------------
-        
-        // 2人以上のプレイ: 次のラウンドを開始
-        function startNextFriendRound() {
-            currentRound++;
-            
-            if (currentRound > totalRounds) {
-                checkOverallWinner();
-                return;
-            }
-
-            // 人数Nに対応したプレイヤー交代ロジック (インデックス 0, 1, 2, ...)
-            
-            // 予想するプレイヤーのインデックス (0 ~ numPlayers - 1) は順番に回る
-            guesserPlayer = (currentRound - 1) % numPlayers; 
-            
-            // 設定者(setter)は、予想者(guesser)の次の人になるように調整。
-            // これにより、ラウンドNでP0が初めて設定者になるローテーションを実現。
-            // R1: P0予 -> P1設, R2: P1予 -> P2設, ..., RN: P(N-1)予 -> P0設
-            setterPlayer = (guesserPlayer + 1) % numPlayers; 
-            
-            const setterName = playerNames[setterPlayer];
-            const guesserName = playerNames[guesserPlayer];
-
-            guessCount = 1;
-            targetNumber = null;
-
-            // UIの切り替え
-            guessInputArea.classList.add('hidden');
-            secretSetterArea.classList.remove('hidden');
-            scoreDisplay.classList.remove('hidden');
-            resetArea.classList.add('hidden');
-            
-            gameTitleElement.textContent = `🤝 対戦モード (ラウンド ${currentRound}/${totalRounds})`;
-            gameTitleElement.className = 'text-3xl font-extrabold text-white mb-4 text-center'; // ゲーム中のタイトルスタイル
-            
-            lastResultElement.textContent = `${setterName}: 秘密の数字（1-100）を決めてね`;
-            lowOrHiElement.textContent = `※${guesserName}に見えないように入力！`;
-            guessesElement.textContent = '前回の予想: ';
-            updateScoreDisplay();
-
-            setGameControls(true); // 予想ボタンは使えないようにする
-            setSecretButton.disabled = false;
-            secretField.focus();
-        }
-        
-        // ------------------------------------
-        // --- CPU対戦モードのロジック ---
-        // ------------------------------------
-
-        // CPUプレイ: 次のラウンドを開始
-        function startNextCPURound() {
-            currentRound++;
-            
-            if (currentRound > totalRounds) {
-                checkOverallWinner();
-                return;
-            }
-
-            guessCount = 1;
-            targetNumber = null;
-            
-            guessesElement.textContent = '前回の予想: ';
-            scoreDisplay.classList.remove('hidden');
-            resetArea.classList.add('hidden');
-            
-            gameTitleElement.className = 'text-3xl font-extrabold text-white mb-4 text-center'; // ゲーム中のタイトルスタイル
+	           // モード/ラウンド選択要素
+	           modeSelectionArea = document.getElementById('modeSelectionArea');
+	           mainGameArea = document.getElementById('mainGameArea');
+	           roundSetterArea = document.getElementById('roundSetterArea');
+	           roundSelect = document.getElementById('roundSelect');
+	           numPlayersSelect = document.getElementById('numPlayersSelect'); // 新しい人数選択
+	           secretSetterArea = document.getElementById('secretSetterArea');
+	           secretField = document.getElementById('secretField');
+	           setSecretButton = document.getElementById('setSecretButton');
+	           
+	           // CPUレベル要素の取得
+	           cpuLevelSelection = document.getElementById('cpuLevelSelection');
+	           cpuLevelSelect = document.getElementById('cpuLevelSelect');
+	           
+	           // プレイヤー名入力要素の取得 (新設)
+	           friendNameInputContainer = document.getElementById('friendNameInputContainer');
+	           
+	           // リザルト画面要素の取得
+	           finalResultArea = document.getElementById('finalResultArea');
+	           finalResultTitle = document.getElementById('finalResultTitle');
+	           finalResultMessage = document.getElementById('finalResultMessage');
+	           finalScoreDetails = document.getElementById('finalScoreDetails');
+	           finalResetButton = document.getElementById('finalResetButton');
 
 
-            // プレイヤーインデックス: P1(0), CPU(1)
-            const isUserGuesser = (currentRound % 2 !== 0); // 奇数ラウンド: ユーザーが予想 (インデックス0)
+	           // --- イベントリスナー設定 ---
+	           document.getElementById('cpuModeButton').addEventListener('click', () => showRoundSelection('cpu'));
+	           document.getElementById('friendModeButton').addEventListener('click', () => showRoundSelection('friend'));
+	           document.getElementById('startFriendGameButton').addEventListener('click', setRounds);
+	           guessSubmitButton.addEventListener('click', checkGuess);
+	           setSecretButton.addEventListener('click', setSecretNumber);
+	           finalResetButton.addEventListener('click', showModeSelection);
+	           
+	           // 人数選択ドロップダウンが変更されたら、名前入力フィールドを更新
+	           numPlayersSelect.addEventListener('change', (e) => generateNameFields(e.target.value));
 
-            if (isUserGuesser) {
-                // 奇数ラウンド: CPU(1)が設定、ユーザー(0)が予想
-                setterPlayer = 1; // CPU
-                guesserPlayer = 0; // ユーザー
-                targetNumber = Math.floor(Math.random() * 100) + 1;
-                
-                secretSetterArea.classList.add('hidden'); 
-                guessInputArea.classList.remove('hidden');
-                
-                gameTitleElement.textContent = `🤖 CPU対戦 (R${currentRound}/${totalRounds}) - ${playerNames[0]}のターン`;
-                lastResultElement.textContent = `${playerNames[1]}の秘密の数字を当ててね！`;
-                lowOrHiElement.textContent = `現在の試行回数: 1`; 
-                setGameControls(false); 
-                guessField.focus();
-                
-            } else {
-                // 偶数ラウンド: ユーザー(0)が設定、CPU(1)が予想
-                setterPlayer = 0; // ユーザー
-                guesserPlayer = 'CPU'; // CPUが予想するときは特殊な値'CPU'を使用
-                
-                guessInputArea.classList.add('hidden');
-                secretSetterArea.classList.remove('hidden');
-                
-                gameTitleElement.textContent = `🤖 CPU対戦 (R${currentRound}/${totalRounds}) - ${playerNames[1]}のターン`;
-                lastResultElement.textContent = `${playerNames[0]}: 秘密の数字（1-100）を決めてね`;
-                lowOrHiElement.textContent = `※${playerNames[1]}に当てられないように、慎重に！`;
-                setGameControls(true);
-                setSecretButton.disabled = false;
-                secretField.focus();
-            }
-            
-            updateScoreDisplay();
-        }
+	           // --- Enterキーでの送信を有効化 ---
+	           guessField.addEventListener('keypress', function(e) {
+	               if (e.key === 'Enter') {
+	                   guessSubmitButton.click();
+	                   e.preventDefault(); 
+	               }
+	           });
+	           secretField.addEventListener('keypress', function(e) {
+	               if (e.key === 'Enter') {
+	                   setSecretButton.click();
+	                   e.preventDefault(); 
+	               }
+	           });
 
-        // プレイヤーが秘密の数字を設定 (共通)
-        function setSecretNumber() {
-            const secret = Number(secretField.value);
-            
-            if (isNaN(secret) || secret < 1 || secret > 100) {
-                alertMessage('無効な入力です。1から100の数字を入力してください。');
-                return;
-            }
+	           showModeSelection();
+	       };
 
-            targetNumber = secret;
-            setSecretButton.disabled = true;
-            secretField.value = '';
-            
-            secretSetterArea.classList.add('hidden');
-            guessInputArea.classList.remove('hidden');
-            
-            // 名前を取得 (友達モード:インデックスから、CPUモード:配列から)
-            const setterName = (gameMode === 'cpu' && setterPlayer === 1) ? playerNames[1] : playerNames[setterPlayer];
-            const guesserName = (gameMode === 'cpu' && guesserPlayer === 'CPU') ? playerNames[1] : playerNames[guesserPlayer];
+	       // モード選択画面を表示
+	       function showModeSelection() {
+	           gameMode = null;
+	           totalRounds = 0;
+	           currentRound = 0;
+	           playerNames = [];
+	           playerScores = [];
+	           
+	           // すべてのゲーム画面を非表示
+	           mainGameArea.classList.add('hidden');
+	           roundSetterArea.classList.add('hidden');
+	           finalResultArea.classList.add('hidden');
+	           
+	           // モード選択画面を表示
+	           modeSelectionArea.classList.remove('hidden');
+	           document.querySelector('.game-card').classList.add('max-w-md');
+	           
+	           // タイトル画面のスタイルに戻す
+	           gameTitleElement.textContent = '🔮 数字当てゲーム';
+	           gameTitleElement.className = 'text-5xl font-extrabold text-yellow-300 mb-2 text-center transform scale-105';
+	           document.getElementById('gameTagline').classList.remove('hidden');
+	       }
 
-            if (guesserPlayer !== 'CPU') {
-                // ユーザー (または友達) が予想する場合
-                lastResultElement.textContent = `${guesserName}: ${setterName}の秘密の数字を当ててね！`;
-                lowOrHiElement.textContent = `現在の試行回数: 1`;
-                setGameControls(false);
-                guessField.focus();
+	       // ラウンド数選択画面を表示
+	       function showRoundSelection(mode) {
+	           gameMode = mode;
+	           modeSelectionArea.classList.add('hidden');
+	           roundSetterArea.classList.remove('hidden');
+	           document.querySelector('.game-card').classList.add('max-w-md'); 
+	           
+	           // タイトルをモード設定用に変更
+	           gameTitleElement.className = 'text-3xl font-extrabold text-white mb-4 text-center';
+	           document.getElementById('gameTagline').classList.add('hidden');
 
-            } else {
-                // CPUが予想する場合
-                lastResultElement.textContent = `${guesserName}があなたの秘密の数字を予想します...`;
-                lowOrHiElement.textContent = `${guesserName}の予想回数: 1`;
-                setGameControls(true);
-                
-                setTimeout(cpuGuess, 1000);
-            }
-        }
-        
-        // CPUの予想ロジック
-        function cpuGuess() {
-            if (guessCount === 1) {
-                cpuGuessData.low = 1;
-                cpuGuessData.high = 100;
-                cpuGuessData.history = [];
-            }
-            
-            let cpuGuessValue;
-            const cpuName = playerNames[1];
+	           if (mode === 'friend') {
+	               gameTitleElement.textContent = '🤝 対戦モード設定 (多人数対応)';
+	               cpuLevelSelection.classList.add('hidden');
+	               document.getElementById('friendPlayerSettings').classList.remove('hidden'); // 人数設定を表示
+	               generateNameFields(numPlayersSelect.value); // 初期人数で名前フィールドを生成
+	           } else {
+	               gameTitleElement.textContent = '🤖 CPU対戦設定';
+	               cpuLevelSelection.classList.remove('hidden');
+	               document.getElementById('friendPlayerSettings').classList.add('hidden'); // 人数設定を非表示
+	           }
+	       }
+	       
+	       // 人数に応じて名前入力フィールドを動的に生成
+	       function generateNameFields(count) {
+	           const container = document.getElementById('friendNameInputContainer');
+	           container.innerHTML = ''; // クリア
+	           numPlayers = Number(count);
+	           
+	           for (let i = 0; i < numPlayers; i++) {
+	               const inputHtml = `
+	                   <input type="text" id="p${i}NameField" placeholder="プレイヤー${i + 1}の名前" 
+	                          value="P${i + 1}" 
+	                          class="p-3 w-full text-lg text-white bg-[#303450] border-2 border-pink-600 rounded-xl focus:border-pink-500 shadow-inner">
+	               `;
+	               container.innerHTML += inputHtml;
+	           }
+	       }
 
-            if (cpuLevel === 'Pro') {
-                cpuGuessValue = Math.floor((cpuGuessData.low + cpuGuessData.high) / 2);
-            } else if (cpuLevel === 'Normal') {
-                if (cpuGuessData.low > cpuGuessData.high || cpuGuessData.high - cpuGuessData.low < 10) {
-                     cpuGuessValue = Math.floor((cpuGuessData.low + cpuGuessData.high) / 2);
-                } else {
-                    cpuGuessValue = Math.floor(Math.random() * (cpuGuessData.high - cpuGuessData.low + 1)) + cpuGuessData.low;
-                }
-            } else if (cpuLevel === 'Easy') {
-                cpuGuessValue = Math.floor(Math.random() * 100) + 1;
-            }
-            
-            cpuGuessData.history.push(cpuGuessValue);
-            guessesElement.textContent = '前回の予想: ' + cpuGuessData.history.join(', ');
-            lowOrHiElement.textContent = `${cpuName}の予想回数: ${guessCount}`;
+	       // ラウンド数を設定してゲームを開始
+	       function setRounds() {
+	           totalRounds = Number(roundSelect.value);
+	           
+	           if (totalRounds <= 0) {
+	                alertMessage('ラウンド数を選択してください。');
+	               return;
+	           }
 
+	           // 1. 名前とスコアの初期化
+	           if (gameMode === 'friend') {
+	               numPlayers = Number(numPlayersSelect.value);
+	               playerNames = [];
+	               for (let i = 0; i < numPlayers; i++) {
+	                   const nameField = document.getElementById(`p${i}NameField`);
+	                   if (!nameField || nameField.value.trim() === '') {
+	                       alertMessage(`プレイヤー${i + 1}の名前を入力してください。`);
+	                       return;
+	                   }
+	                   playerNames.push(nameField.value.trim());
+	               }
+	               playerScores = new Array(numPlayers).fill(0);
+	           } else if (gameMode === 'cpu') {
+	               cpuLevel = cpuLevelSelect.value;
+	               playerNames = ['あなた', `CPU (${cpuLevel})`];
+	               playerScores = [0, 0]; // P1(0), CPU(1)
+	           }
+	           
+	           // 2. バリデーション (友達モードではラウンド数が人数Nで割り切れることが望ましいが、必須としない)
+	           if (gameMode === 'friend' && totalRounds % numPlayers !== 0) {
+	               // アラートではなく警告
+	               console.warn("ラウンド数がプレイヤー人数で割り切れないため、ラウンド途中でゲームが終了する可能性があります。");
+	           }
+	           
+	           // 3. ゲーム開始
+	           roundSetterArea.classList.add('hidden');
+	           mainGameArea.classList.remove('hidden');
+	           finalResultArea.classList.add('hidden');
+	           document.querySelector('.game-card').classList.remove('max-w-md'); 
+	           
+	           currentRound = 0;
+	           
+	           if (gameMode === 'cpu') {
+	               startNextCPURound();
+	           } else {
+	               startNextFriendRound();
+	           }
+	       }
+	       
+	       // ------------------------------------
+	       // --- 友達対戦モードのロジック ---
+	       // ------------------------------------
+	       
+	       // 2人以上のプレイ: 次のラウンドを開始
+	       function startNextFriendRound() {
+	           currentRound++;
+	           
+	           if (currentRound > totalRounds) {
+	               checkOverallWinner();
+	               return;
+	           }
 
-            let resultMessage;
-            let isFinished = false;
+	           // 人数Nに対応したプレイヤー交代ロジック (インデックス 0, 1, 2, ...)
+	           
+	           // 予想するプレイヤーのインデックス (0 ~ numPlayers - 1) は順番に回る
+	           guesserPlayer = (currentRound - 1) % numPlayers; 
+	           
+	           // 設定者(setter)は、予想者(guesser)の次の人になるように調整。
+	           // これにより、ラウンドNでP0が初めて設定者になるローテーションを実現。
+	           // R1: P0予 -> P1設, R2: P1予 -> P2設, ..., RN: P(N-1)予 -> P0設
+	           setterPlayer = (guesserPlayer + 1) % numPlayers; 
+	           
+	           const setterName = playerNames[setterPlayer];
+	           const guesserName = playerNames[guesserPlayer];
 
-            if (cpuGuessValue === targetNumber) {
-                resultMessage = `🎯 ${cpuName}の予想: ${cpuGuessValue}！正解です！`;
-                isFinished = true;
-            } else if (cpuGuessValue < targetNumber) {
-                resultMessage = `⬇️ ${cpuName}の予想: ${cpuGuessValue}。もっと大きい数字ですね。`;
-                if (cpuLevel !== 'Easy') {
-                    cpuGuessData.low = cpuGuessValue + 1;
-                }
-            } else {
-                resultMessage = `⬆️ ${cpuName}の予想: ${cpuGuessValue}。もっと小さい数字ですね。`;
-                if (cpuLevel !== 'Easy') {
-                    cpuGuessData.high = cpuGuessValue - 1;
-                }
-            }
+	           guessCount = 1;
+	           targetNumber = null;
 
-            lastResultElement.textContent = resultMessage;
-            
-            guessCount++;
+	           // UIの切り替え
+	           guessInputArea.classList.add('hidden');
+	           secretSetterArea.classList.remove('hidden');
+	           scoreDisplay.classList.remove('hidden');
+	           resetArea.classList.add('hidden');
+	           
+	           gameTitleElement.textContent = `🤝 対戦モード (ラウンド ${currentRound}/${totalRounds})`;
+	           gameTitleElement.className = 'text-3xl font-extrabold text-white mb-4 text-center'; // ゲーム中のタイトルスタイル
+	           
+	           lastResultElement.textContent = `${setterName}: 秘密の数字（1-100）を決めてね`;
+	           lowOrHiElement.textContent = `※${guesserName}に見えないように入力！`;
+	           guessesElement.textContent = '前回の予想: ';
+	           updateScoreDisplay();
 
-            if (isFinished) {
-                endRound('CPU', false);
-            } else {
-                setTimeout(cpuGuess, 1500);
-            }
-        }
+	           setGameControls(true); // 予想ボタンは使えないようにする
+	           setSecretButton.disabled = false;
+	           secretField.focus();
+	       }
+	       
+	       // ------------------------------------
+	       // --- CPU対戦モードのロジック ---
+	       // ------------------------------------
 
+	       // CPUプレイ: 次のラウンドを開始
+	       function startNextCPURound() {
+	           currentRound++;
+	           
+	           if (currentRound > totalRounds) {
+	               checkOverallWinner();
+	               return;
+	           }
 
-        // 予想のチェック (ユーザーが予想する場合の共通ロジック)
-        function checkGuess() {
-            if (targetNumber === null) return; 
-
-            const userGuess = Number(guessField.value);
-
-            if (isNaN(userGuess) || userGuess < 1 || userGuess > 100) {
-                alertMessage('無効な入力です。1から100の数字を入力してください。');
-                guessField.value = '';
-                guessField.focus();
-                return;
-            }
-
-            if (guessCount === 1) {
-                guessesElement.textContent = '前回の予想: ';
-            }
-            guessesElement.textContent += userGuess + (userGuess !== targetNumber ? ', ' : '');
-
-            // 判定ロジック
-            if (userGuess === targetNumber) {
-                endRound(guesserPlayer, false);
-            } else {
-                lastResultElement.textContent = '残念、間違いです！';
-                lastResultElement.className = 'text-lg font-semibold mb-2 text-yellow-400';
-                
-                lowOrHiElement.textContent = `現在の試行回数: ${guessCount + 1}`;
-
-                if (userGuess < targetNumber) {
-                    lowOrHiElement.textContent += ' (ヒント: もっと大きい数字です)';
-                } else if (userGuess > targetNumber) {
-                    lowOrHiElement.textContent += ' (ヒント: もっと小さい数字です)';
-                }
-                
-                guessCount++;
-                guessField.focus();
-            }
-
-            guessField.value = '';
-        }
-
-        // ラウンド終了処理 (共通)
-        function endRound(guesser, failed = false) {
-            const score = guessCount - 1; 
-
-            // スコアを記録
-            if (guesser === 'CPU') {
-                playerScores[1] += score; // CPUは常にインデックス1
-            } else {
-                playerScores[guesser] += score; // guesserはインデックス (0, 1, ...)
-            }
-
-            updateScoreDisplay();
-            setGameControls(true);
-
-            // メッセージ表示 (名前を使用)
-            const guesserName = guesser === 'CPU' ? playerNames[1] : playerNames[guesser];
-            
-            lastResultElement.textContent = `🎉 ラウンド${currentRound}終了！ ${guesserName}は ${score}回で正解！`;
-            lastResultElement.className = 'text-xl font-bold mb-2 text-green-400';
-            
-            lowOrHiElement.textContent = '次のラウンドへ進むか、勝敗判定を行います。';
-            resetArea.classList.remove('hidden');
-            
-            const resetButton = document.getElementById('resetButton');
-            resetButton.replaceWith(resetButton.cloneNode(true));
-            
-            const nextRoundFunction = gameMode === 'cpu' ? startNextCPURound : startNextFriendRound;
-            const actionFunction = currentRound < totalRounds ? nextRoundFunction : checkOverallWinner;
-            
-            document.getElementById('resetButton').addEventListener('click', actionFunction);
-            resetButton.textContent = currentRound < totalRounds ? '次のラウンドへ' : '勝敗判定へ';
-        }
-        
-        // 総合的な勝利判定 (共通)
-        function checkOverallWinner() {
-            setGameControls(true);
-            
-            resetArea.classList.add('hidden');
-            mainGameArea.classList.add('hidden');
-            
-            finalResultArea.classList.remove('hidden');
-            document.querySelector('.game-card').classList.remove('max-w-md');
-            document.querySelector('.game-card').classList.add('max-w-lg');
-
-            let titleText = `🎉 全${totalRounds}ラウンド終了！ 🎉`;
-            let resultMessageText = "";
-            let scoreDetailsText = '合計試行回数が少ない方が勝利です。<br/><br/>';
-            let messageClass = 'text-3xl font-extrabold text-white'; 
-
-            let minScore = Infinity;
-            let winnerNames = [];
-            
-            // スコア詳細のリストアップ
-            playerScores.forEach((score, index) => {
-                const name = playerNames[index];
-                scoreDetailsText += `${name}: ${score}回<br/>`;
-                
-                if (score < minScore) {
-                    minScore = score;
-                    winnerNames = [name];
-                } else if (score === minScore) {
-                    winnerNames.push(name);
-                }
-            });
-
-            // 勝敗メッセージ
-            if (winnerNames.length === playerScores.length) {
-                resultMessageText = `🤝 全員が同じスコア！完全引き分けです！ 🤝`;
-                messageClass = 'text-3xl font-extrabold text-indigo-300';
-            } else if (winnerNames.length === 1) {
-                resultMessageText = `🏆 ${winnerNames[0]}の完全勝利！ 🏆`;
-                messageClass = 'text-4xl font-extrabold text-yellow-300 animate-win';
-            } else {
-                resultMessageText = `🤝 引き分け！勝者は ${winnerNames.join(' と ')} です！ 🤝`;
-                messageClass = 'text-3xl font-extrabold text-indigo-300';
-            }
-            
-            finalResultTitle.textContent = titleText;
-            finalResultMessage.innerHTML = resultMessageText;
-            finalResultMessage.className = messageClass;
-            finalScoreDetails.innerHTML = scoreDetailsText;
-
-            lowOrHiElement.textContent = '勝敗判定完了。'; 
-        }
+	           guessCount = 1;
+	           targetNumber = null;
+	           
+	           guessesElement.textContent = '前回の予想: ';
+	           scoreDisplay.classList.remove('hidden');
+	           resetArea.classList.add('hidden');
+	           
+	           gameTitleElement.className = 'text-3xl font-extrabold text-white mb-4 text-center'; // ゲーム中のタイトルスタイル
 
 
-        // スコア表示を更新 (共通)
-        function updateScoreDisplay() {
-            let scoreHtml = '';
-            
-            playerNames.forEach((name, index) => {
-                const score = playerScores[index];
-                const isGuesser = (gameMode === 'cpu' && index === 1 && guesserPlayer === 'CPU') || 
-                                  (guesserPlayer === index);
-                                  
-                scoreHtml += `<span class="${isGuesser ? 'text-pink-400' : 'text-gray-400'}">${name} 合計: ${score}回</span>`;
-            });
+	           // プレイヤーインデックス: P1(0), CPU(1)
+	           const isUserGuesser = (currentRound % 2 !== 0); // 奇数ラウンド: ユーザーが予想 (インデックス0)
 
-            const setterName = (gameMode === 'cpu' && setterPlayer === 1) ? playerNames[1] : playerNames[setterPlayer];
-            const guesserName = (gameMode === 'cpu' && guesserPlayer === 'CPU') ? playerNames[1] : playerNames[guesserPlayer];
+	           if (isUserGuesser) {
+	               // 奇数ラウンド: CPU(1)が設定、ユーザー(0)が予想
+	               setterPlayer = 1; // CPU
+	               guesserPlayer = 0; // ユーザー
+	               targetNumber = Math.floor(Math.random() * 100) + 1;
+	               
+	               secretSetterArea.classList.add('hidden'); 
+	               guessInputArea.classList.remove('hidden');
+	               
+	               gameTitleElement.textContent = `🤖 CPU対戦 (R${currentRound}/${totalRounds}) - ${playerNames[0]}のターン`;
+	               lastResultElement.textContent = `${playerNames[1]}の秘密の数字を当ててね！`;
+	               lowOrHiElement.textContent = `現在の試行回数: 1`; 
+	               setGameControls(false); 
+	               guessField.focus();
+	               
+	           } else {
+	               // 偶数ラウンド: ユーザー(0)が設定、CPU(1)が予想
+	               setterPlayer = 0; // ユーザー
+	               guesserPlayer = 'CPU'; // CPUが予想するときは特殊な値'CPU'を使用
+	               
+	               guessInputArea.classList.add('hidden');
+	               secretSetterArea.classList.remove('hidden');
+	               
+	               gameTitleElement.textContent = `🤖 CPU対戦 (R${currentRound}/${totalRounds}) - ${playerNames[1]}のターン`;
+	               lastResultElement.textContent = `${playerNames[0]}: 秘密の数字（1-100）を決めてね`;
+	               lowOrHiElement.textContent = `※${playerNames[1]}に当てられないように、慎重に！`;
+	               setGameControls(true);
+	               setSecretButton.disabled = false;
+	               secretField.focus();
+	           }
+	           
+	           updateScoreDisplay();
+	       }
 
-            scoreDisplay.innerHTML = `
-                <div class="flex justify-around flex-wrap font-bold text-lg space-x-4">
-                    ${scoreHtml}
-                </div>
-                <p class="text-sm text-center mt-2 text-indigo-300">
-                    設定者: ${setterName} / 予想者: ${guesserName}
-                </p>
-                <p class="text-sm text-center mt-1 text-white">
-                    ラウンド ${currentRound}/${totalRounds}
-                </p>
-            `;
-        }
-        
-        // ゲーム終了処理（ボタンの有効化/無効化）
-        function setGameControls(isFinished) {
-            guessField.disabled = isFinished;
-            guessSubmitButton.disabled = isFinished;
-        }
+	       // プレイヤーが秘密の数字を設定 (共通)
+	       function setSecretNumber() {
+	           const secret = Number(secretField.value);
+	           
+	           if (isNaN(secret) || secret < 1 || secret > 100) {
+	               alertMessage('無効な入力です。1から100の数字を入力してください。');
+	               return;
+	           }
 
-        // カスタムアラートメッセージ
-        function alertMessage(message) {
-            const messageBox = document.getElementById('customMessageBox');
-            const alertText = document.getElementById('alertText');
-            const overlay = document.getElementById('alertOverlay');
-            
-            alertText.textContent = message;
-            overlay.classList.remove('hidden');
-            messageBox.classList.remove('opacity-0', 'scale-95');
-            messageBox.classList.add('opacity-100', 'scale-100');
-        }
+	           targetNumber = secret;
+	           setSecretButton.disabled = true;
+	           secretField.value = '';
+	           
+	           secretSetterArea.classList.add('hidden');
+	           guessInputArea.classList.remove('hidden');
+	           
+	           // 名前を取得 (友達モード:インデックスから、CPUモード:配列から)
+	           const setterName = (gameMode === 'cpu' && setterPlayer === 1) ? playerNames[1] : playerNames[setterPlayer];
+	           const guesserName = (gameMode === 'cpu' && guesserPlayer === 'CPU') ? playerNames[1] : playerNames[guesserPlayer];
 
-        // カスタムアラートを閉じる
-        function closeAlert() {
-            const messageBox = document.getElementById('customMessageBox');
-            const overlay = document.getElementById('alertOverlay');
-            
-            messageBox.classList.remove('opacity-100', 'scale-100');
-            messageBox.classList.add('opacity-0', 'scale-95');
-            overlay.classList.add('hidden');
-        }
-    </script>
+	           if (guesserPlayer !== 'CPU') {
+	               // ユーザー (または友達) が予想する場合
+	               lastResultElement.textContent = `${guesserName}: ${setterName}の秘密の数字を当ててね！`;
+	               lowOrHiElement.textContent = `現在の試行回数: 1`;
+	               setGameControls(false);
+	               guessField.focus();
+
+	           } else {
+	               // CPUが予想する場合
+	               lastResultElement.textContent = `${guesserName}があなたの秘密の数字を予想します...`;
+	               lowOrHiElement.textContent = `${guesserName}の予想回数: 1`;
+	               setGameControls(true);
+	               
+	               setTimeout(cpuGuess, 1000);
+	           }
+	       }
+	       
+	       // CPUの予想ロジック
+	       function cpuGuess() {
+	           if (guessCount === 1) {
+	               cpuGuessData.low = 1;
+	               cpuGuessData.high = 100;
+	               cpuGuessData.history = [];
+	           }
+	           
+	           let cpuGuessValue;
+	           const cpuName = playerNames[1];
+
+	           if (cpuLevel === 'Pro') {
+	               cpuGuessValue = Math.floor((cpuGuessData.low + cpuGuessData.high) / 2);
+	           } else if (cpuLevel === 'Normal') {
+	               if (cpuGuessData.low > cpuGuessData.high || cpuGuessData.high - cpuGuessData.low < 10) {
+	                    cpuGuessValue = Math.floor((cpuGuessData.low + cpuGuessData.high) / 2);
+	               } else {
+	                   cpuGuessValue = Math.floor(Math.random() * (cpuGuessData.high - cpuGuessData.low + 1)) + cpuGuessData.low;
+	               }
+	           } else if (cpuLevel === 'Easy') {
+	               cpuGuessValue = Math.floor(Math.random() * 100) + 1;
+	           }
+	           
+	           cpuGuessData.history.push(cpuGuessValue);
+	           guessesElement.textContent = '前回の予想: ' + cpuGuessData.history.join(', ');
+	           lowOrHiElement.textContent = `${cpuName}の予想回数: ${guessCount}`;
+
+
+	           let resultMessage;
+	           let isFinished = false;
+
+	           if (cpuGuessValue === targetNumber) {
+	               resultMessage = `🎯 ${cpuName}の予想: ${cpuGuessValue}！正解です！`;
+	               isFinished = true;
+	           } else if (cpuGuessValue < targetNumber) {
+	               resultMessage = `⬇️ ${cpuName}の予想: ${cpuGuessValue}。もっと大きい数字ですね。`;
+	               if (cpuLevel !== 'Easy') {
+	                   cpuGuessData.low = cpuGuessValue + 1;
+	               }
+	           } else {
+	               resultMessage = `⬆️ ${cpuName}の予想: ${cpuGuessValue}。もっと小さい数字ですね。`;
+	               if (cpuLevel !== 'Easy') {
+	                   cpuGuessData.high = cpuGuessValue - 1;
+	               }
+	           }
+
+	           lastResultElement.textContent = resultMessage;
+	           
+	           guessCount++;
+
+	           if (isFinished) {
+	               endRound('CPU', false);
+	           } else {
+	               setTimeout(cpuGuess, 1500);
+	           }
+	       }
+
+
+	       // 予想のチェック (ユーザーが予想する場合の共通ロジック)
+	       function checkGuess() {
+	           if (targetNumber === null) return; 
+
+	           const userGuess = Number(guessField.value);
+
+	           if (isNaN(userGuess) || userGuess < 1 || userGuess > 100) {
+	               alertMessage('無効な入力です。1から100の数字を入力してください。');
+	               guessField.value = '';
+	               guessField.focus();
+	               return;
+	           }
+
+	           if (guessCount === 1) {
+	               guessesElement.textContent = '前回の予想: ';
+	           }
+	           guessesElement.textContent += userGuess + (userGuess !== targetNumber ? ', ' : '');
+
+	           // 判定ロジック
+	           if (userGuess === targetNumber) {
+	               endRound(guesserPlayer, false);
+	           } else {
+	               lastResultElement.textContent = '残念、間違いです！';
+	               lastResultElement.className = 'text-lg font-semibold mb-2 text-yellow-400';
+	               
+	               lowOrHiElement.textContent = `現在の試行回数: ${guessCount + 1}`;
+
+	               if (userGuess < targetNumber) {
+	                   lowOrHiElement.textContent += ' (ヒント: もっと大きい数字です)';
+	               } else if (userGuess > targetNumber) {
+	                   lowOrHiElement.textContent += ' (ヒント: もっと小さい数字です)';
+	               }
+	               
+	               guessCount++;
+	               guessField.focus();
+	           }
+
+	           guessField.value = '';
+	       }
+
+	       // ラウンド終了処理 (共通)
+	       function endRound(guesser, failed = false) {
+	           const score = guessCount - 1; 
+
+	           // スコアを記録
+	           if (guesser === 'CPU') {
+	               playerScores[1] += score; // CPUは常にインデックス1
+	           } else {
+	               playerScores[guesser] += score; // guesserはインデックス (0, 1, ...)
+	           }
+
+	           updateScoreDisplay();
+	           setGameControls(true);
+
+	           // メッセージ表示 (名前を使用)
+	           const guesserName = guesser === 'CPU' ? playerNames[1] : playerNames[guesser];
+	           
+	           lastResultElement.textContent = `🎉 ラウンド${currentRound}終了！ ${guesserName}は ${score}回で正解！`;
+	           lastResultElement.className = 'text-xl font-bold mb-2 text-green-400';
+	           
+	           lowOrHiElement.textContent = '次のラウンドへ進むか、勝敗判定を行います。';
+	           resetArea.classList.remove('hidden');
+	           
+	           const resetButton = document.getElementById('resetButton');
+	           resetButton.replaceWith(resetButton.cloneNode(true));
+	           
+	           const nextRoundFunction = gameMode === 'cpu' ? startNextCPURound : startNextFriendRound;
+	           const actionFunction = currentRound < totalRounds ? nextRoundFunction : checkOverallWinner;
+	           
+	           document.getElementById('resetButton').addEventListener('click', actionFunction);
+	           resetButton.textContent = currentRound < totalRounds ? '次のラウンドへ' : '勝敗判定へ';
+	       }
+	       
+	       // 総合的な勝利判定 (共通)
+	       function checkOverallWinner() {
+	           setGameControls(true);
+	           
+	           resetArea.classList.add('hidden');
+	           mainGameArea.classList.add('hidden');
+	           
+	           finalResultArea.classList.remove('hidden');
+	           document.querySelector('.game-card').classList.remove('max-w-md');
+	           document.querySelector('.game-card').classList.add('max-w-lg');
+
+	           let titleText = `🎉 全${totalRounds}ラウンド終了！ 🎉`;
+	           let resultMessageText = "";
+	           let scoreDetailsText = '合計試行回数が少ない方が勝利です。<br/><br/>';
+	           let messageClass = 'text-3xl font-extrabold text-white'; 
+
+	           let minScore = Infinity;
+	           let winnerNames = [];
+	           
+	           // スコア詳細のリストアップ
+	           playerScores.forEach((score, index) => {
+	               const name = playerNames[index];
+	               scoreDetailsText += `${name}: ${score}回<br/>`;
+	               
+	               if (score < minScore) {
+	                   minScore = score;
+	                   winnerNames = [name];
+	               } else if (score === minScore) {
+	                   winnerNames.push(name);
+	               }
+	           });
+
+	           // 勝敗メッセージ
+	           if (winnerNames.length === playerScores.length) {
+	               resultMessageText = `🤝 全員が同じスコア！完全引き分けです！ 🤝`;
+	               messageClass = 'text-3xl font-extrabold text-indigo-300';
+	           } else if (winnerNames.length === 1) {
+	               resultMessageText = `🏆 ${winnerNames[0]}の完全勝利！ 🏆`;
+	               messageClass = 'text-4xl font-extrabold text-yellow-300 animate-win';
+	           } else {
+	               resultMessageText = `🤝 引き分け！勝者は ${winnerNames.join(' と ')} です！ 🤝`;
+	               messageClass = 'text-3xl font-extrabold text-indigo-300';
+	           }
+	           
+	           finalResultTitle.textContent = titleText;
+	           finalResultMessage.innerHTML = resultMessageText;
+	           finalResultMessage.className = messageClass;
+	           finalScoreDetails.innerHTML = scoreDetailsText;
+
+	           lowOrHiElement.textContent = '勝敗判定完了。'; 
+	       }
+
+
+	       // スコア表示を更新 (共通)
+	       function updateScoreDisplay() {
+	           let scoreHtml = '';
+	           
+	           playerNames.forEach((name, index) => {
+	               const score = playerScores[index];
+	               const isGuesser = (gameMode === 'cpu' && index === 1 && guesserPlayer === 'CPU') || 
+	                                 (guesserPlayer === index);
+	                                 
+	               scoreHtml += `<span class="${isGuesser ? 'text-pink-400' : 'text-gray-400'}">${name} 合計: ${score}回<\/span>`;
+	           });
+
+	           const setterName = (gameMode === 'cpu' && setterPlayer === 1) ? playerNames[1] : playerNames[setterPlayer];
+	           const guesserName = (gameMode === 'cpu' && guesserPlayer === 'CPU') ? playerNames[1] : playerNames[guesserPlayer];
+
+	           scoreDisplay.innerHTML = `
+	               <div class="flex justify-around flex-wrap font-bold text-lg space-x-4">
+	                   ${scoreHtml}
+	               <\/div>
+	               <p class="text-sm text-center mt-2 text-indigo-300">
+	                   設定者: ${setterName} / 予想者: ${guesserName}
+	               <\/p>
+	               <p class="text-sm text-center mt-1 text-white">
+	                   ラウンド ${currentRound}/${totalRounds}
+	               <\/p>
+	           `;
+	       }
+	       
+	       // ゲーム終了処理（ボタンの有効化/無効化）
+	       function setGameControls(isFinished) {
+	           guessField.disabled = isFinished;
+	           guessSubmitButton.disabled = isFinished;
+	       }
+
+	       // カスタムアラートメッセージ
+	       function alertMessage(message) {
+	           const messageBox = document.getElementById('customMessageBox');
+	           const alertText = document.getElementById('alertText');
+	           const overlay = document.getElementById('alertOverlay');
+	           
+	           alertText.textContent = message;
+	           overlay.classList.remove('hidden');
+	           messageBox.classList.remove('opacity-0', 'scale-95');
+	           messageBox.classList.add('opacity-100', 'scale-100');
+	       }
+
+	       // カスタムアラートを閉じる
+	       function closeAlert() {
+	           const messageBox = document.getElementById('customMessageBox');
+	           const overlay = document.getElementById('alertOverlay');
+	           
+	           messageBox.classList.remove('opacity-100', 'scale-100');
+	           messageBox.classList.add('opacity-0', 'scale-95');
+	           overlay.classList.add('hidden');
+	       }
+	</script>
 </head>
+
 <body class="bg-[#1a1a2e]">
-
-    <!-- カスタムアラートメッセージボックス (alert()の代わりに利用) -->
-    <div id="alertOverlay" class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 transition-opacity hidden">
-        <div id="customMessageBox" class="bg-[#242740] p-6 rounded-xl shadow-2xl transition-all duration-300 opacity-0 scale-95 max-w-sm w-full border border-pink-500/50">
-            <p id="alertText" class="text-white mb-4 text-center text-lg font-medium"></p>
-            <button onclick="closeAlert()" class="w-full p-2 bg-pink-600 text-white font-bold rounded-lg transition duration-200 hover:bg-pink-700">OK</button>
-        </div>
-    </div>
-
-    <!-- メインゲームコンテナ -->
-    <div class="game-card max-w-md w-full p-8 bg-[#242740] rounded-2xl shadow-2xl border border-indigo-700/50">
-
-        <!-- タイトル (タイトル画面では特大、ゲーム中は通常サイズにJSで切り替え) -->
-        <h1 id="gameTitle" class="text-5xl font-extrabold text-yellow-300 mb-2 text-center transform scale-105">
-            🔮 数字当てゲーム
-        </h1>
-        <p id="gameTagline" class="text-indigo-300 text-center text-lg mb-8">
-            1から100の間の数を当てよう。試行回数無制限！
-        </p>
-
-        <!-- 1. モード選択エリア (タイトル画面風の初期表示) -->
-        <div id="modeSelectionArea" class="space-y-6 pt-4 border-t border-indigo-500/50">
-            <h2 class="text-2xl font-bold text-center text-pink-200">
-                🎮 モードを選択
-            </h2>
-            <button id="friendModeButton" class="w-full p-5 bg-pink-600 text-white text-xl font-bold rounded-xl shadow-lg shadow-pink-500/50 transition duration-300 btn-primary" type="button">
-                🤝 お友達と対戦！ (2-4人)
-            </button>
-            <button id="cpuModeButton" class="w-full p-5 bg-indigo-600 text-white text-xl font-bold rounded-xl shadow-lg shadow-indigo-500/50 transition duration-300 btn-primary" type="button">
-                🤖 CPUと対戦！ (2人固定)
-            </button>
-        </div>
-        
-        <!-- 2. ラウンド数/人数設定エリア (CPU/2人プレイ選択後) -->
-        <div id="roundSetterArea" class="hidden space-y-4">
-            <h2 class="text-xl font-bold text-center text-pink-200 mb-4">対戦設定</h2>
-            
-            <!-- ラウンド数選択 -->
-            <label for="roundSelect" class="text-base font-medium text-pink-300">合計ラウンド数を選択:</label>
-            <select id="roundSelect" class="p-3 w-full text-xl text-white bg-[#303450] border-2 border-pink-600 rounded-xl focus:border-pink-500 focus:ring-0 shadow-inner">
-                <option value="">ラウンドを選択</option>
-                <option value="4">4 ラウンド</option>
-                <option value="6">6 ラウンド</option>
-                <option value="8">8 ラウンド</option>
-                <option value="12">12 ラウンド</option>
-                <option value="20">20 ラウンド</option>
-            </select>
-            
-            <!-- 友達対戦用のプレイヤー人数/名前設定エリア (新設) -->
-            <div id="friendPlayerSettings" class="space-y-4 pt-4 border-t border-gray-700/50 hidden">
-                <label for="numPlayersSelect" class="text-base font-medium text-pink-300">🎮 プレイヤー人数を選択:</label>
-                <select id="numPlayersSelect" class="p-3 w-full text-xl text-white bg-[#303450] border-2 border-pink-600 rounded-xl focus:border-pink-500 focus:ring-0 shadow-inner">
-                    <option value="2">2人</option>
-                    <option value="3">3人</option>
-                    <option value="4">4人</option>
-                </select>
-                
-                <label class="text-base font-medium text-pink-300 block text-center">🤝 プレイヤー名を設定</label>
-                <!-- 名前入力フィールドのコンテナ -->
-                <div id="friendNameInputContainer" class="space-y-3">
-                    <!-- JSで動的に生成されます -->
-                </div>
-            </div>
-
-            
-            <!-- CPUレベル選択エリア (既存) -->
-            <div id="cpuLevelSelection" class="space-y-2 hidden pt-4 border-t border-gray-700/50"> 
-                <label for="cpuLevelSelect" class="text-lg font-medium text-green-300">🤖 CPUの難易度を選択:</label>
-                <select id="cpuLevelSelect" class="p-3 w-full text-xl text-white bg-[#303450] border-2 border-green-600 rounded-xl focus:border-green-500 focus:ring-0 shadow-inner">
-                    <option value="Pro">Pro (プロ) - 最速</option>
-                    <option value="Normal">Normal (普通) - 範囲を絞る</option>
-                    <option value="Easy">Easy (初心者) - 完全ランダム</option>
-                </select>
-            </div>
-            
-            <button id="startFriendGameButton" class="w-full p-3 bg-pink-600 text-white font-bold rounded-xl shadow-lg shadow-pink-500/50 transition duration-300 btn-primary" type="button">
-                ゲームスタート！
-            </button>
-            <div class="text-center">
-                <button onclick="showModeSelection()" class="text-sm text-indigo-400 hover:text-indigo-300 transition duration-200 mt-2">
-                    モード選択に戻る
-                </button>
-            </div>
-        </div>
+	<!-- カスタムアラートメッセージボックス (alert()の代わりに利用) -->
 
 
-        <!-- 3. メインゲームエリア (ラウンド設定後に表示) -->
-        <div id="mainGameArea" class="hidden">
-            
-            <!-- スコアとラウンドの表示 -->
-            <div id="scoreDisplay" class="bg-[#303450] p-3 rounded-xl shadow-inner mb-4 hidden">
-                <!-- スコアはJavaScriptで更新される -->
-            </div>
-            
-            <!-- 3-1. 秘密の数字設定エリア (対戦モード P1/P2交代で利用) -->
-            <div id="secretSetterArea" class="flex flex-col space-y-4 mb-6 hidden">
-                <label for="secretField" class="text-lg font-medium text-indigo-200 text-center">
-                    秘密の数字 (1〜100) を決めてね
-                </label>
-                <input type="number" id="secretField" class="p-4 w-full text-3xl text-white bg-[#303450] border-2 border-pink-600 rounded-xl focus:border-pink-500 focus:ring-0 transition duration-300 shadow-inner" min="1" max="100">
-                <button id="setSecretButton" class="p-3 bg-pink-600 text-white font-bold rounded-xl shadow-lg shadow-pink-500/50 transition duration-300 btn-primary" type="button">
-                    数字を決める
-                </button>
-            </div>
+	<div class="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 transition-opacity hidden" id="alertOverlay">
+		<div class="bg-[#242740] p-6 rounded-xl shadow-2xl transition-all duration-300 opacity-0 scale-95 max-w-sm w-full border border-pink-500/50" id="customMessageBox">
+			<p class="text-white mb-4 text-center text-lg font-medium" id="alertText">
+			</p>
+			<button class="w-full p-2 bg-pink-600 text-white font-bold rounded-lg transition duration-200 hover:bg-pink-700" onclick="closeAlert()">OK</button>
+		</div>
+	</div>
+	<!-- メインゲームコンテナ -->
 
-            <!-- 3-2. 予想入力エリア -->
-            <div id="guessInputArea" class="flex flex-col space-y-4 mb-6 hidden">
-                <label for="guessField" class="text-lg font-medium text-indigo-200">
-                    あなたの予想 (1〜100):
-                </label>
-                <input type="number" id="guessField" class="p-3 w-full text-xl text-white bg-[#303450] border-2 border-indigo-600 rounded-xl focus:border-pink-500 focus:ring-0 transition duration-300 shadow-inner" min="1" max="100">
-                <button id="guessSubmit" class="p-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/50 transition duration-300 btn-primary" type="button">
-                    予想を送信
-                </button>
-            </div>
 
-            <!-- 結果表示エリア -->
-            <div class="bg-[#303450] p-4 rounded-xl shadow-inner space-y-3">
-                <div id="messageArea" class="text-center">
-                    <p id="lastResult" class="text-lg font-semibold mb-2 text-white">さあ、予想を入力してね！</p>
-                    <p id="lowOrHi" class="text-base font-medium text-indigo-300">現在の試行回数: 1</p>
-                </div>
-                <p id="guesses" class="text-sm text-gray-400 break-words">前回の予想: </p>
-            </div>
+	<div class="game-card max-w-md w-full p-8 bg-[#242740] rounded-2xl shadow-2xl border border-indigo-700/50">
+		<!-- タイトル (タイトル画面では特大、ゲーム中は通常サイズにJSで切り替え) -->
 
-            <!-- リセットボタンエリア (ラウンド終了/ゲーム終了時に表示) -->
-            <div id="resetArea" class="mt-6 hidden text-center">
-                <button id="resetButton" class="p-3 bg-pink-600 text-white font-bold rounded-xl shadow-lg shadow-pink-500/50 transition duration-300 btn-primary" type="button">
-                    次のラウンドへ
-                </button>
-            </div>
-            
-        </div> <!-- #mainGameArea 終了 -->
-        
-        <!-- 4. 最終リザルト画面エリア (新設) -->
-        <div id="finalResultArea" class="hidden text-center p-8 bg-[#303450] rounded-2xl shadow-2xl border border-green-500/50 space-y-8 max-w-lg w-full">
-            <h2 id="finalResultTitle" class="text-4xl font-extrabold text-green-300"></h2>
-            
-            <div id="finalResultMessage" class="text-2xl font-bold text-yellow-300">
-                <!-- 勝利メッセージが入る -->
-            </div>
-            
-            <div class="bg-[#242740] p-4 rounded-xl shadow-inner">
-                <p class="text-lg text-indigo-300 mb-2">最終合計試行回数 (少ない方が勝利)</p>
-                <p id="finalScoreDetails" class="xl font-mono text-white leading-relaxed">
-                    <!-- 詳細スコアが入る -->
-                </p>
-            </div>
-            
-            <button id="finalResetButton" class="w-full p-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/50 transition duration-300 btn-primary" type="button">
-                モード選択に戻る
-            </button>
-        </div>
 
-    </div>
+		<h1 class="text-5xl font-extrabold text-yellow-300 mb-2 text-center transform scale-105" id="gameTitle">🔮 数字当てゲーム</h1>
+
+
+		<p class="text-indigo-300 text-center text-lg mb-8" id="gameTagline">1から100の間の数を当てよう。試行回数無制限！</p>
+		<!-- 1. モード選択エリア (タイトル画面風の初期表示) -->
+
+
+		<div class="space-y-6 pt-4 border-t border-indigo-500/50" id="modeSelectionArea">
+			<h2 class="text-2xl font-bold text-center text-pink-200">🎮 モードを選択</h2>
+			<button class="w-full p-5 bg-pink-600 text-white text-xl font-bold rounded-xl shadow-lg shadow-pink-500/50 transition duration-300 btn-primary" id="friendModeButton" type="button">🤝 お友達と対戦！ (2-4人)</button> <button class="w-full p-5 bg-indigo-600 text-white text-xl font-bold rounded-xl shadow-lg shadow-indigo-500/50 transition duration-300 btn-primary" id="cpuModeButton" type="button">🤖 CPUと対戦！ (2人固定)</button>
+		</div>
+		<!-- 2. ラウンド数/人数設定エリア (CPU/2人プレイ選択後) -->
+
+
+		<div class="hidden space-y-4" id="roundSetterArea">
+			<h2 class="text-xl font-bold text-center text-pink-200 mb-4">対戦設定</h2>
+			<!-- ラウンド数選択 -->
+			<label class="text-base font-medium text-pink-300" for="roundSelect">合計ラウンド数を選択:</label> <select class="p-3 w-full text-xl text-white bg-[#303450] border-2 border-pink-600 rounded-xl focus:border-pink-500 focus:ring-0 shadow-inner" id="roundSelect">
+				<option value="">
+					ラウンドを選択
+				</option>
+
+				<option value="4">
+					4 ラウンド
+				</option>
+
+				<option value="6">
+					6 ラウンド
+				</option>
+
+				<option value="8">
+					8 ラウンド
+				</option>
+
+				<option value="12">
+					12 ラウンド
+				</option>
+
+				<option value="20">
+					20 ラウンド
+				</option>
+			</select> <!-- 友達対戦用のプレイヤー人数/名前設定エリア (新設) -->
+
+
+			<div class="space-y-4 pt-4 border-t border-gray-700/50 hidden" id="friendPlayerSettings">
+				<label class="text-base font-medium text-pink-300" for="numPlayersSelect">🎮 プレイヤー人数を選択:</label> <select class="p-3 w-full text-xl text-white bg-[#303450] border-2 border-pink-600 rounded-xl focus:border-pink-500 focus:ring-0 shadow-inner" id="numPlayersSelect">
+					<option value="2">
+						2人
+					</option>
+
+					<option value="3">
+						3人
+					</option>
+
+					<option value="4">
+						4人
+					</option>
+				</select> <label class="text-base font-medium text-pink-300 block text-center">🤝 プレイヤー名を設定</label> <!-- 名前入力フィールドのコンテナ -->
+
+
+				<div class="space-y-3" id="friendNameInputContainer">
+					<!-- JSで動的に生成されます -->
+				</div>
+			</div>
+			<!-- CPUレベル選択エリア (既存) -->
+
+
+			<div class="space-y-2 hidden pt-4 border-t border-gray-700/50" id="cpuLevelSelection">
+				<label class="text-lg font-medium text-green-300" for="cpuLevelSelect">🤖 CPUの難易度を選択:</label> <select class="p-3 w-full text-xl text-white bg-[#303450] border-2 border-green-600 rounded-xl focus:border-green-500 focus:ring-0 shadow-inner" id="cpuLevelSelect">
+					<option value="Pro">
+						Pro (プロ) - 最速
+					</option>
+
+					<option value="Normal">
+						Normal (普通) - 範囲を絞る
+					</option>
+
+					<option value="Easy">
+						Easy (初心者) - 完全ランダム
+					</option>
+				</select>
+			</div>
+			<button class="w-full p-3 bg-pink-600 text-white font-bold rounded-xl shadow-lg shadow-pink-500/50 transition duration-300 btn-primary" id="startFriendGameButton" type="button">ゲームスタート！</button>
+
+			<div class="text-center">
+				<button class="text-sm text-indigo-400 hover:text-indigo-300 transition duration-200 mt-2" onclick="showModeSelection()">モード選択に戻る</button>
+			</div>
+		</div>
+		<!-- 3. メインゲームエリア (ラウンド設定後に表示) -->
+
+
+		<div class="hidden" id="mainGameArea">
+			<!-- スコアとラウンドの表示 -->
+
+
+			<div class="bg-[#303450] p-3 rounded-xl shadow-inner mb-4 hidden" id="scoreDisplay">
+				<!-- スコアはJavaScriptで更新される -->
+			</div>
+			<!-- 3-1. 秘密の数字設定エリア (対戦モード P1/P2交代で利用) -->
+
+
+			<div class="flex flex-col space-y-4 mb-6 hidden" id="secretSetterArea">
+				<label class="text-lg font-medium text-indigo-200 text-center" for="secretField">秘密の数字 (1〜100) を決めてね</label> <input class="p-4 w-full text-3xl text-white bg-[#303450] border-2 border-pink-600 rounded-xl focus:border-pink-500 focus:ring-0 transition duration-300 shadow-inner" id="secretField" max="100" min="1" type="number"> <button class="p-3 bg-pink-600 text-white font-bold rounded-xl shadow-lg shadow-pink-500/50 transition duration-300 btn-primary" id="setSecretButton" type="button">数字を決める</button>
+			</div>
+			<!-- 3-2. 予想入力エリア -->
+
+
+			<div class="flex flex-col space-y-4 mb-6 hidden" id="guessInputArea">
+				<label class="text-lg font-medium text-indigo-200" for="guessField">あなたの予想 (1〜100):</label> <input class="p-3 w-full text-xl text-white bg-[#303450] border-2 border-indigo-600 rounded-xl focus:border-pink-500 focus:ring-0 transition duration-300 shadow-inner" id="guessField" max="100" min="1" type="number"> <button class="p-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/50 transition duration-300 btn-primary" id="guessSubmit" type="button">予想を送信</button>
+			</div>
+			<!-- 結果表示エリア -->
+
+
+			<div class="bg-[#303450] p-4 rounded-xl shadow-inner space-y-3">
+				<div class="text-center" id="messageArea">
+					<p class="text-lg font-semibold mb-2 text-white" id="lastResult">さあ、予想を入力してね！</p>
+
+
+					<p class="text-base font-medium text-indigo-300" id="lowOrHi">現在の試行回数: 1</p>
+				</div>
+
+
+				<p class="text-sm text-gray-400 break-words" id="guesses">前回の予想:</p>
+			</div>
+			<!-- リセットボタンエリア (ラウンド終了/ゲーム終了時に表示) -->
+
+
+			<div class="mt-6 hidden text-center" id="resetArea">
+				<button class="p-3 bg-pink-600 text-white font-bold rounded-xl shadow-lg shadow-pink-500/50 transition duration-300 btn-primary" id="resetButton" type="button">次のラウンドへ</button>
+			</div>
+		</div>
+		<!-- #mainGameArea 終了 -->
+		<!-- 4. 最終リザルト画面エリア (新設) -->
+
+
+		<div class="hidden text-center p-8 bg-[#303450] rounded-2xl shadow-2xl border border-green-500/50 space-y-8 max-w-lg w-full" id="finalResultArea">
+			<h2 class="text-4xl font-extrabold text-green-300" id="finalResultTitle">
+			</h2>
+
+
+			<div class="text-2xl font-bold text-yellow-300" id="finalResultMessage">
+				<!-- 勝利メッセージが入る -->
+			</div>
+
+
+			<div class="bg-[#242740] p-4 rounded-xl shadow-inner">
+				<p class="text-lg text-indigo-300 mb-2">最終合計試行回数 (少ない方が勝利)</p>
+
+
+				<p class="xl font-mono text-white leading-relaxed" id="finalScoreDetails"><!-- 詳細スコアが入る -->
+				</p>
+			</div>
+			<button class="w-full p-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/50 transition duration-300 btn-primary" id="finalResetButton" type="button">モード選択に戻る</button>
+		</div>
+	</div>
 </body>
 </html>
